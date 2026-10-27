@@ -1,0 +1,678 @@
+---
+title: "Profils financiers des emprunteurs : Approche par Analyse en Composantes Principales"
+author: "DAGBO Elisée & Ly Néné Gallé"
+editor: visual
+
+format:
+  pdf:
+    toc: true
+    number-sections: true
+
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+library(psych)
+library(corrplot)
+library(stringr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(PerformanceAnalytics)
+library(EnvStats)
+library(lsr)
+library(vcd)
+library(reshape2)
+library(mice)
+library(FactoMineR)
+library(missMDA)
+library(factoextra)
+```
+
+
+# Introduction
+
+Dans un contexte où le recours au crédit joue un rôle central dans le financement des ménages, la compréhension des profils financiers des emprunteurs constitue un enjeu important pour les institutions financières. L’étude des relations entre revenu, dépenses, épargne et endettement permet en effet de mieux appréhender les comportements financiers et les facteurs susceptibles d’influencer la situation budgétaire des individus.
+
+Le jeu de données utilisé dans cette étude provient du site Kaggle et fait la synthèse de caractéristiques économiques, personnelles et financières de plusieurs individus. Il est composé de 256 observations, chacune correspondant à un individu, et regroupe des informations socio-démographiques, financières et liées à l’emprunt bancaire. Il comprend 11 variables quantitatives telles que l’âge, le revenu mensuel, les dépenses, l’épargne, le montant du prêt, la mensualité, le score de crédit, le taux d’intérêt, le ratio Dette/Revenu, le ratio Épargne/Revenu et la durée du prêt, ainsi que 3 variables qualitatives comme le sexe, la région et le type de prêt. L’ensemble de ces informations permet d’analyser les comportements financiers des individus.
+
+Dans ce cadre, l’objectif de ce travail est d’explorer et de caractériser les profils financiers de notre échantillon d’emprunteurs à partir d’une approche statistique descriptive et multidimensionnelle.
+
+Pour ce faire, une analyse statistique descriptive est menée. Elle débute par une analyse univariée, visant à décrire individuellement chaque variable à l’aide de statistiques descriptives et de représentations graphiques adaptées. Cette analyse sera ensuite complétée par une étude bivariée et une analyse factorielle, afin d’explorer les relations entre les variables et d’identifier d’éventuelles structures sous-jacentes dans les données.
+
+# Analyse Univariée
+
+## Analyse Univariée des variables quantitatives
+
+```{r}
+library(readr)
+DATA <- read_csv("data/DATA.csv")
+
+```
+
+### Conversion des types de variables
+
+```{r}
+
+DATA$Type_Pret <- as.factor(DATA$Type_Pret)
+DATA$Region <- as.factor(DATA$Region)
+DATA$Sexe <- as.factor(DATA$Sexe)
+
+
+```
+
+### Vérification des types
+
+```{r}
+
+str(DATA)
+summary(DATA)
+
+```
+
+### Histogrammes des variables quantitatives
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+par(mfrow = c(3, 2), mar = c(3, 3, 2, 1))
+
+# Liste des variables quantitatives
+quanti_vars <- c("Age", "Revenu_Mensuel", "Depenses_Mensuelles", "Epargne",
+                 "Montant_Pret", "Duree_Pret_Mois", "Mensualite_Pret",
+                 "Taux_Interet_Pret", "Ratio_Dette_Revenu", "Score_Credit",
+                 "Ratio_Epargne_Revenu")
+
+
+
+# Histogrammes 
+for (v in quanti_vars) {
+  hist(DATA[[v]],
+       main = paste("Histogramme de", v),
+       xlab = v,
+       ylab = "Fréquence",
+       col = "blue",
+       border = "white")
+}
+
+
+
+```
+
+La population étudiée est composée d’individus majoritairement adultes, avec un âge moyen d’environ 44 ans et une répartition allant de 18 à 69 ans, traduisant une structure relativement équilibrée.
+Sur le plan financier, les individus présentent des niveaux de revenus hétérogènes, avec un revenu mensuel moyen d’environ 4939 et une distribution normale et symétrique . Les dépenses mensuelles s’élèvent en moyenne à 2 985, ce qui représente une part significative du revenu et influence directement la capacité d’épargne des individus; Son histogramme montre une distribution légèrement asymetrique à droite. Enfin, l’épargne totale apparaît relativement élevée en moyenne (environ 293 595), mais sa forte variabilité met en évidence des comportements d’accumulation très différenciés selon les profils et une distribution asymetrique à droite avec des valeurs qui tendent à diminuer au fur et à mesure que le montant augmente.
+
+Les caractéristiques des emprunts bancaires mettent en évidence une grande diversité de situations.Le montant moyen des prêts s’élève à environ 83 627, avec une dispersion asymetrique à droite importante, ce qui révèle des niveaux d’endettement très contrastés au sein de l’échantillon. La durée moyenne des prêts est d’environ 216 mois, illustrant la coexistence d’emprunts de court, moyen et long terme.
+
+La mensualité de remboursement présente également une moyenne élevée et une forte variabilité, reflétant l’hétérogénéité conjointe des montants empruntés, des durées et des taux appliqués. Le taux d’intérêt moyen est d’environ 14,36 %, avec une large plage de variation, indiquant des conditions de crédit très diverses selon les individus.
+
+En termes de solvabilité, le ratio dette-revenu est en moyenne de 0,20, avec des valeurs comprises entre 0,01 et 0,40, ce qui suggère que la majorité des individus présentent un niveau d’endettement modéré par rapport à leurs revenus, malgré l’existence de situations plus contraignantes.Sa distribution est plus ou moins uniforme. Le score de crédit moyen est d’environ 592, avec une forte dispersion allant de 300 à 842, traduisant une hétérogénéité marquée des profils de solvabilité. Enfin, le ratio épargne-revenu affiche une moyenne proche de 4,84 et une médiane de 5,02, indiquant que, pour une grande partie des individus, le niveau d’épargne représente plusieurs fois le revenu mensuel, bien que des écarts significatifs persistent.
+
+### Box-plots des variables quantitatives
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+# Liste des variables quantitatives
+quanti_vars <- c("Age", "Revenu_Mensuel", "Depenses_Mensuelles", "Epargne",
+                 "Montant_Pret", "Duree_Pret_Mois", "Mensualite_Pret",
+                 "Taux_Interet_Pret", "Ratio_Dette_Revenu", "Score_Credit",
+                 "Ratio_Epargne_Revenu")
+
+# Mise en page : 4 lignes x 3 colonnes
+par(mfrow = c(3, 2), mar = c(3, 3, 2, 1))
+
+# Boucle pour tracer les boxplots
+for (v in quanti_vars) {
+  boxplot(DATA[[v]],
+          main = paste("Boxplot de", v),
+         
+          col = "lightblue",
+          border = "blue")
+}
+
+```
+
+Les variables Dépenses_mensuelles, Epargne, Montant_pret et Mensualité_pret semblent présenter des valeurs atypiques. Nous allons donc réaliser un test ESD pour verifier leur présence réelle. 
+
+### Gestion des outliers : TEST ESD
+
+```{r}
+
+# FONCTION POUR CALCULER R_i
+
+rval <- function(y) {
+  ares <- abs(y - mean(y)) / sd(y)
+  df <- data.frame(y = y, ares = ares)
+  r <- max(df$ares)
+  list(r = r, df = df)
+}
+
+alpha <- 0.05
+k <- 20   # nombre maximum d’outliers testés
+
+
+# 1) VARIABLE : EPARGNE
+
+y <- DATA$Epargne
+n <- length(y)
+
+lam <- numeric(k)
+R <- numeric(k)
+
+for (i in 1:k) {
+  if (i == 1) {
+    rt <- rval(y)
+    R[i] <- rt$r
+    newdf <- rt$df[rt$df$ares != max(rt$df$ares), ]
+  } else {
+    rt <- rval(newdf$y)
+    R[i] <- rt$r
+    newdf <- rt$df[rt$df$ares != max(rt$df$ares), ]
+  }
+  p <- 1 - alpha / (2 * (n - i + 1))
+  t <- qt(p, n - i - 1)
+  lam[i] <- t * (n - i) / sqrt((n - i - 1 + t^2) * (n - i + 1))
+}
+
+esd_epargne <- data.frame(
+  No_Outliers = 1:k,
+  Test_Stat = R,
+  Critical_Value = lam
+)
+
+print("===== ESD Test - Variable: Epargne =====")
+print(esd_epargne)
+
+
+# 2) VARIABLE : MONTANT_PRET
+
+y <- DATA$Montant_Pret
+n <- length(y)
+
+lam <- numeric(k)
+R <- numeric(k)
+
+for (i in 1:k) {
+  if (i == 1) {
+    rt <- rval(y)
+    R[i] <- rt$r
+    newdf <- rt$df[rt$df$ares != max(rt$df$ares), ]
+  } else {
+    rt <- rval(newdf$y)
+    R[i] <- rt$r
+    newdf <- rt$df[rt$df$ares != max(rt$df$ares), ]
+  }
+  p <- 1 - alpha / (2 * (n - i + 1))
+  t <- qt(p, n - i - 1)
+  lam[i] <- t * (n - i) / sqrt((n - i - 1 + t^2) * (n - i + 1))
+}
+
+esd_montant <- data.frame(
+  No_Outliers = 1:k,
+  Test_Stat = R,
+  Critical_Value = lam
+)
+
+print("===== ESD Test - Variable: Montant_Pret =====")
+print(esd_montant)
+
+
+# 3) VARIABLE : MENSUALITE_PRET
+
+y <- DATA$Mensualite_Pret
+n <- length(y)
+
+lam <- numeric(k)
+R <- numeric(k)
+
+for (i in 1:k) {
+  if (i == 1) {
+    rt <- rval(y)
+    R[i] <- rt$r
+    newdf <- rt$df[rt$df$ares != max(rt$df$ares), ]
+  } else {
+    rt <- rval(newdf$y)
+    R[i] <- rt$r
+    newdf <- rt$df[rt$df$ares != max(rt$df$ares), ]
+  }
+  p <- 1 - alpha / (2 * (n - i + 1))
+  t <- qt(p, n - i - 1)
+  lam[i] <- t * (n - i) / sqrt((n - i - 1 + t^2) * (n - i + 1))
+}
+
+esd_mensualite <- data.frame(
+  No_Outliers = 1:k,
+  Test_Stat = R,
+  Critical_Value = lam
+)
+
+print("===== ESD Test - Variable: Mensualite_Pret =====")
+print(esd_mensualite)
+
+```
+
+Le test ESD appliqué aux variables financières montre que seule la variable montant du prêt présente des valeurs atypiques significatives, avec quatre observations identifiées comme outliers. En revanche, aucune valeur aberrante n’est détectée pour les variables épargne et mensualité du prêt, dont la dispersion reste compatible avec une variabilité normale. Ainsi nous allons procéder à la suppression de ces valeurs abérrantes.
+
+```{r}
+
+# Supression de ces 4 outliers pour Montant_Pret
+
+
+# 1) Identifier les indices des 4 valeurs les plus extrêmes
+indices_outliers <- order(abs(DATA$Montant_Pret - mean(DATA$Montant_Pret)),
+                           decreasing = TRUE)[1:4]
+
+indices_outliers
+
+# 2) Supprimer uniquement ces observations
+DATA <- DATA[-indices_outliers, ]
+
+# 3) Vérification
+# dim avant = 256 x 14
+dim(DATA)
+
+
+```
+
+## Analyse univariée des variables qualitatives
+
+### Diagramme Circulaire
+```{r}
+couleurs <- c(
+  "Immobilier" = "firebrick3",
+  "Business" = "sienna2",
+  "Education" = "mediumpurple3",
+  "Automobile" = "lightblue",
+  "Amérique_Nord" = "mistyrose2",
+  "Europe" = "skyblue4",
+  "Asie" = "darksalmon",
+  "Afrique" = "gray40")
+  
+  
+# diagrammes circulaires
+par(mfrow = c(2, 2), mar = c(2, 2, 3, 1))
+
+# 1) Type de prêt
+
+freq_type <- table(DATA$Type_Pret)
+pct_type <- round(prop.table(freq_type) * 100, 1)
+
+pie(freq_type,
+    labels = paste(names(freq_type), "\n", pct_type, "%"),
+    col = couleurs[names(freq_type)],
+    main = "Type de prêt")
+
+
+# 2) Région
+
+freq_region <- table(DATA$Region)
+pct_region <- round(prop.table(freq_region) * 100, 1)
+
+pie(freq_region,
+    labels = paste(names(freq_region), "\n", pct_region, "%"),
+    col = couleurs[names(freq_region)],
+    main = "Région")
+
+
+# 3) Sexe
+
+freq_sexe <- table(DATA$Sexe)
+pct_sexe <- round(prop.table(freq_sexe) * 100, 1)
+
+pie(freq_sexe,
+    labels = paste(names(freq_sexe), "\n", pct_sexe, "%"),
+    main = "Sexe",
+    col = rainbow(length(freq_sexe)))
+
+par(mfrow = c(1, 1))
+
+
+```
+
+Les diagrammes circulaires montrent une répartition relativement équilibrée des individus selon le type de prêt, l’immobilier, le business et les études représentant des parts comparables, ce qui traduit une diversité des besoins de financement. La répartition géographique est également homogène entre l’Europe, l’Afrique, l’Asie et l’Amérique du Nord, suggérant une bonne représentativité régionale de l’échantillon. Enfin, la distribution par sexe est quasiment paritaire, avec une légère majorité de femmes, ce qui limite les biais liés au genre dans l’analyse des comportements d’emprunt.
+
+# Analyse Bivariée
+
+## Relation entre 2 variables quantitatives :
+
+### Matrice de corrélation de Pearson
+
+```{r}
+data_quant <- DATA[quanti_vars]
+```
+
+```{r}
+#| fig-width: 8
+#| fig-height: 8
+# Matrice de corrélation de Pearson
+cor_matrix <- cor(data_quant, use = "complete.obs", method = "pearson")
+
+corrplot(round(cor_matrix, 2), method = "color", type = "upper", 
+         addCoef.col = "black",tl.cex = 0.8, tl.col = "black", number.cex = 0.5)
+```
+
+L’analyse de la matrice de corrélation de Pearson permet de mettre en évidence plusieurs relations intéressantes entre les variables financières de notre jeu de données. On observe d’abord une forte corrélation positive entre le revenu mensuel et les dépenses mensuelles (r = 0,81), ce qui signifie que les individus qui gagnent davantage ont tendance à dépenser plus, ce qui est cohérent d’un point de vue économique. Le revenu mensuel est également positivement lié à l’épargne (r = 0,61), montrant qu’un niveau de revenu plus élevé permet généralement de mettre davantage d’argent de côté. Le montant du prêt est fortement associé à la mensualité de remboursement (r = 0,69) ainsi qu’au ratio dette/revenu (r = 0,62), ce qui confirme que plus le montant emprunté est élevé, plus la charge de remboursement est importante. Nous pouvons aussi remarquer une corrélation négative modérée entre le montant du prêt et le taux d’intérêt (r = −0,41), ce qui peut suggérer que les personnes de notre bases de données obtenant des prêts plus élevés bénéficient d'un taux d'intéret légèrement plus avantageuses. Ces résultats montrent que le revenu et le montant du prêt jouent un rôle importante dans la situation financière des individus étudiés.
+
+### Nuages de points (scatter plots)
+
+```{r}
+## 1. Montant_Pret × Mensualite_Pret
+ggplot(DATA, aes(x = Montant_Pret, y = Mensualite_Pret)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(x = "Montant du prêt",
+       y = "Mensualité du prêt",
+       title = "Nuage de points : Montant du prêt vs Mensualité")
+
+## 2. Mensualité_Pret × Ratio_Dette_Revenu
+ggplot(DATA, aes(x = Mensualite_Pret, y = Ratio_Dette_Revenu)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(x = "Mensualite du prêt",
+       y = "Ratio_Dette_Revenu",
+       title = "Nuage de points : Mensualité du prêt vs Ratio_Dette_Revenu")
+
+## 3. Revenu_Mensuel × Depenses_Mensuelles
+ggplot(DATA, aes(x = Revenu_Mensuel, y = Depenses_Mensuelles)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(x = "Revenu mensuel",
+       y = "Dépenses mensuelles",
+       title = "Nuage de points : Revenu vs Dépenses")
+
+## 4. Montant_Pret × Duree_Pret_Mois
+ggplot(DATA, aes(x = Montant_Pret, y = Duree_Pret_Mois)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(x = "Montant du prêt",
+       y = "Duree_Pret_Mois",
+       title = "Nuage de points : Montant du pret vs Duree du Pret en Mois")
+
+## 5. Score_Credit × Ratio_Dette_Revenu
+ggplot(DATA, aes(x = Ratio_Dette_Revenu, y = Score_Credit)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(x = "Ratio dette / revenu",
+       y = "Score de crédit",
+       title = "Nuage de points : Score de crédit vs Ratio dette/revenu")
+
+```
+
+Tout d’abord, le nuage de points revenu mensuel vs dépenses mensuelles met en évidence une relation linéaire positive forte : les dépenses augmentent nettement avec le revenu. Cette observation est parfaitement cohérente avec la corrélation observée précédemment (r ≈ 0,81). Aussi, le graphique montant du prêt vs mensualité montre une relation positive : plus le montant emprunté est important, plus la mensualité de remboursement augmente. Ici la dispersion autour de la droite rouge reste modérée et confirme la corrélation relativement forte mise en évidence dans la matrice (r ≈ 0,69). Le graphique mensualité du prêt vs ratio dette/revenu met aussi en évidence une liaison positive : la mensualité contribue directement à l’augmentation du ratio d’endettement, ce qui est économiquement attendu et cohérent avec les corrélations observées. Cependant, le nuage montant du prêt vs durée du prêt montre une tendance positive mais avec une dispersion importante, ce qui confirme que la corrélation entre ces variables est plus faible c'est-à-dire que pour un même montant, les durées peuvent varier selon peut-etre la stratégie de remboursement ou le profil de la personne. Enfin, le graphique score de crédit vs ratio dette/revenu montre une relation légèrement négative mais très dispersée, en accord avec la matrice qui indiquait une corrélation faible. Globalement, l’ensemble des graphiques confirme la cohérence des résultats de la matrice de corrélation.
+
+## Relation entre 2 variables qualitatives :
+
+```{r}
+vars_quali <- c("Type_Pret", "Region", "Sexe")
+
+DATA_quali <- DATA[vars_quali]
+```
+
+### Tableaux de contingence
+
+```{r}
+# Créer une liste vide pour stocker les tableaux
+tabs_qual <- list()
+
+# Boucle sur toutes les paires de variables qualitatives
+for (i in 1:(length(vars_quali) - 1)) {
+  for (j in (i + 1):length(vars_quali)) {
+    var1 <- vars_quali[i]
+    var2 <- vars_quali[j]
+    
+    tab_ij <- table(DATA[[var1]], DATA[[var2]])
+    
+    # Ajouter les totaux (lignes, colonnes, total général)
+    tab_ij_tot <- addmargins(tab_ij)
+    
+    # Sauvegarde dans la liste (avec totaux)
+    nom_tab <- paste(var1, var2, sep = "_x_")
+    tabs_qual[[nom_tab]] <- tab_ij_tot
+    
+    # Affichage
+    cat("\n=============================\n")
+    cat("Tableau de contingence :", var1, "x", var2, "\n")
+    print(tab_ij_tot)
+    
+  }
+}
+
+```
+
+Les tableaux de contingence permettent d’examiner la répartition des individus selon le type de prêt, la région et le sexe. La distribution apparaît globalement assez équilibrée entre les zones géographiques, lorsque nous regardons le tableau Region x Type de Pret. Chaque type de prêt est représenté dans toutes les régions avec des effectifs relativement proches. Cette relation homogène suggère qu’il n’existe pas de spécialisation géographique très marquée dans le type de crédit souscrit. Parlant du croisement entre le type de prêt et le sexe, nous remarquons aussi une répartition également assez équilibrée pour l’ensemble des catégories. Les femmes sont légèrement plus nombreuses dans les prêts Automobile et Business, tandis que les hommes sont un peu plus présents dans les prêts Études et Immobilier, mais les écarts restent faibles. Cela suggère qu’il n’existe pas de différenciation forte du type de prêt selon le sexe dans notre base. Enfin, l’analyse de la relation entre la région et le sexe montre quelques diférences plus visibles : les femmes sont plus nombreuses en Afrique, alors que les hommes sont légèrement plus représentés en Asie et en Europe. En Amérique du Nord, la répartition est quasiment identique. Dans l’ensemble, on remarque donc une indépendance entre les variables qualitatives, ce qui devra être confirmé par un test du χ².
+
+### Test du X² 
+```{r}
+res_chi2 <- data.frame(
+  Var1    = character(),
+  Var2    = character(),
+  Khi2    = numeric(),
+  ddl     = numeric(),
+  p_value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+for (i in 1:(length(vars_quali) - 1)) {
+  for (j in (i + 1):length(vars_quali)) {
+    var1 <- vars_quali[i]
+    var2 <- vars_quali[j]
+    
+    tab_ij  <- table(DATA[[var1]], DATA[[var2]])
+    test_ij <- chisq.test(tab_ij)
+    
+    res_chi2 <- rbind(
+      res_chi2,
+      data.frame(
+        Var1    = var1,
+        Var2    = var2,
+        Khi2    = unname(test_ij$statistic),
+        ddl     = unname(test_ij$parameter),
+        p_value = unname(test_ij$p.value)
+      )
+    )
+  }
+}
+
+res_chi2
+
+```
+
+Globalement, nous constatons que les p-values associées aux différents tests du χ² sont toutes largement supérieures au seuil de 5 %. Ce qui veut dire que nous ne rejetons pas l’hypothèse nulle d’indépendance entre les variables qualitatives étudiées. Nous n’avons donc pas de preuve statistique d’une association entre ces variables qualitatives : elles apparaissent indépendantes dans notre échantillon.
+
+## Relation entre la varible Type de pret et toutes les variables quantitatives
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+DATA |>
+  select(
+    Type_Pret,
+    Age,
+    Revenu_Mensuel,
+    Depenses_Mensuelles,
+    Epargne,
+    Montant_Pret,
+    Duree_Pret_Mois,
+    Mensualite_Pret,
+    Taux_Interet_Pret,
+    Score_Credit,
+    Ratio_Dette_Revenu,
+    Ratio_Epargne_Revenu
+  ) |>
+  pivot_longer(
+    cols = -Type_Pret,
+    names_to = "variable",
+    values_to = "valeur"
+  ) |>
+  ggplot(aes(x = Type_Pret, y = valeur, fill = Type_Pret)) +
+  geom_boxplot() +
+  facet_wrap(~ variable, scales = "free_y") +
+  theme_minimal() +
+  labs(
+    title = "Boxplots des variables quantitatives selon le type de prêt",
+    x = "Type de prêt",
+    y = "Valeur"
+  )
+
+
+```
+
+Les boxplots montrent que le type de prêt est fortement lié au niveau des variables financières : les prêts immobiliers ont globalement les montants et mensualités les plus élevés, suivis des prêts automobiles, tandis que les prêts business et surtout études présentent des montants plus faibles. 
+On observe aussi une forte dispersion pour la plupart des variables (montant, mensualité, revenu, dépenses, épargne), avec de nombreux cas extrêmes, ce qui traduit une grande hétérogénéité des situations au sein d’un même type de prêt. Globalement, plus le projet financé est coûteux (notamment l’immobilier), plus les niveaux de montants accordés et de flux financiers associés sont élevés, alors que les prêts études s’accompagnent de volumes financiers nettement plus modestes.
+
+# Analyse Factorielle (ACP)
+
+## Justification du choix de la méthode
+
+Dans le cadre de notre étude, nous avons choisi de recourir à une Analyse en Composantes Principales (ACP). En effet, notre base comporte majoritairement des variables numériques (revenu, dépenses, épargne, montant du prêt, mensualité, ratios, etc.) qui présentent entre elles certaines corrélations mises en évidence lors de l’analyse bivariée. L’ACP est particulièrement adaptée dans ce contexte puisqu’elle permet de réduire la dimension du jeu de données tout en conservant un maximum d’information, et de mettre en évidence les principales structures de dépendance entre les variables. Cette méthode facilite également l’identification de profils d’individus et la visualisation des relations entre variables financières de notre base. Ainsi, le recours à l’ACP apparaît pertinent pour mieux comprendre l’organisation globale de nos données.
+
+## Préparation des données :
+
+Après avoir justifié le recours à l’Analyse en Composantes Principales, il est nécessaire de vérifier que les conditions d’application de cette méthode sont bien respectées. Pour cela, nous allons faire le test KMO (Kaiser-Meyer-Olkin), qui évalue l’adéquation de l’échantillon, ainsi que le test de Bartlett, qui permet de vérifier que les variables sont suffisamment corrélées entre elles. Ces tests constituent une étape préalable indispensable avant la mise en œuvre de l’ACP sur notre jeu de données.
+
+### Test KMO
+
+```{r}
+X <- DATA[, quanti_vars]
+```
+
+```{r}
+R <- cor(X, use = "pairwise.complete.obs")
+KMO(R)
+
+```
+
+Le test KMO global donne une valeur de 0,53, ce qui indique une qualité d’échantillonnage moyenne pas vraiment acceptable pour une ACP. Cependant les MSA individuels révèlent que certaines variables présentent une adéquation insuffisante. En particulier, Duree_Pret_Mois (0,27), Taux_Interet_Pret (0,31) et Ratio_Epargne_Revenu (0,34) affichent des valeurs inférieures au seuil de 0,40. Et on a donc sugéré de les enlever du lot des variables avant de faire l'ACP.
+
+```{r}
+vars_quant_rest <- c("Revenu_Mensuel",
+                    "Depenses_Mensuelles",
+                    "Epargne",
+                    "Mensualite_Pret",
+                "Montant_Pret","Ratio_Dette_Revenu","Score_Credit","Age")
+X_ <- DATA[, vars_quant_rest]
+C <- cor(X_, use = "pairwise.complete.obs")
+KMO(C)
+
+```
+
+Après retrait des 3 variables les moins adaptées, le test KMO global s’améliore pour atteindre 0,64, ce qui correspond à une qualité d’échantillonnage jugée acceptable pour la réalisation de l’ACP. La majorité des variables présentent désormais des MSA satisfaisants, mais, la variable Age conserve un MSA inférieur au seuil de 0,40 (MSA = 0,39). De plus, lorsque l’ACP est réalisée en la conservant, l’âge tend à former une dimension spécifique quasi isolée, ce qui va à l’encontre de l’objectif de l’ACP qui vise à résumer l’information en regroupant les variables corrélées dans un nombre réduit de composantes. Afin d’obtenir une structure factorielle plus pertinente, nous avons donc décidé d’exclure la variable Age de l’analyse. Le KMO demeure stable autour de 0,64, ce qui confirme la pertinence du modèle retenu pour la suite de l’ACP.
+
+### Test de Bartlett
+
+```{r}
+cortest.bartlett(C, n = nrow(X_))
+
+```
+
+Le test de Bartlett donne une statistique χ² = 1183,85 avec une p-value extrêmement faible. Cette p-value est largement inférieure au seuil de 5 %, on rejete donc l’hypothèse nulle selon laquelle la matrice de corrélation serait une matrice identité. D'où, les 7 variables sont significativement corrélées entre elles, ce qui constitue une condition essentielle pour la mise en œuvre d’une Analyse en Composantes Principales.
+
+## Réalisation de l'ACP
+
+```{r}
+data_acp<-DATA |>
+  select(
+         Montant_Pret,Revenu_Mensuel,Depenses_Mensuelles,Epargne,
+         Mensualite_Pret,Score_Credit,Ratio_Dette_Revenu)
+
+Res_ACP <- PCA(data_acp,scale.unit = TRUE)
+
+```
+
+## Choix du nombre de dimensions :
+
+### Éboulis des valeurs propres (scree plot): Critère de Coude
+
+```{r}
+
+# Préparation des données
+df_eig <- data.frame(
+  Dim = factor(1:nrow(Res_ACP$eig)),
+  Eigenvalue = Res_ACP$eig[,1]
+)
+
+# Graphique ggplot
+ggplot(df_eig, aes(x = Dim, y = Eigenvalue)) +
+  geom_col(fill = "steelblue") +
+  geom_hline(yintercept = 1, color = "red") +
+  labs(title = "Éboulis des valeurs propres",
+       x = "Dimension",
+       y = "Valeur propre") 
+```
+
+L’éboulis des valeurs propres montre un coude marqué après la deuxième composante : la diminution des valeurs propres est très forte entre les deux premières dimensions puis devient beaucoup plus progressive par la suite. Selon donc le critère du coude, il est pertinent de retenir deux dimensions pour la suite de l’Analyse en Composantes Principales, afin d’obtenir une représentation interprétable des données.
+
+### Règle de Kaiser: Pourcentage d’inertie expliquée
+
+```{r}
+round(Res_ACP$eig,digit=2)
+```
+
+Le critère de Kaiser vient confirmer le choix effectué à partir du critère du coude. En effet, selon cette règle, seules les composantes dont la valeur propre est supérieure à 1 doivent être retenues. Dans notre cas, seules les deux premières dimensions vérifient cette condition, avec des valeurs propres respectives de 3,23 et 1,62. Aussi, la première composante explique à elle seule 46,13 % de la variance totale, tandis que la deuxième en explique 23,21 %. Ensemble, les deux premières dimensions restituent ainsi 69,34 % de l’information contenue dans les données, ce qui constitue une part suffisante pour une représentation pertinente. Ainsi, on retient deux (02) dimensions pour l'ACP.
+
+## Interprétation des axes factoriels :
+
+```{r}
+
+Res_ACP$var
+
+```
+
+Deux axes étant retenus, nous allons les interpreter en visant les variables les plus correlées à ces differents axes. Comme nous pouvons le voir, la première dimension (Dim 1) est fortement et positivement corrélée avec la mensualité du prêt (0,91), le revenu mensuel (0,77), les dépenses mensuelles (0,71), le montant du prêt (0,71) et l’épargne (0,63). Les contributions les plus importantes proviennent de la mensualité du prêt (25,5 %), du revenu mensuel ( 18,3 %) et des dépenses (15,8 %). De plus, les cos² élevés pour plusieurs de ces variables (notamment mensualité 0,82 et revenu  0,59) indiquent qu’elles sont bien représentées sur cet axe. Ce qui veut donc dire que cette dimension (Dim1) oppose les individus ayant des revenus, dépenses, epargne et engagements financiers élevés à ceux présentant des niveaux plus faibles. Elle peut donc etre interpreter comme un axe de Capacité Financiere Globale. Conernant la Dim 2, elle est dominée par le ratio dette/revenu, fortement corrélé négativement (−0,73) et représentant la contribution la plus importante (33 %). Cet axe permet donc de distinguer, à capacité financière égale, ceux qui sont "étouffés" par leurs crédits de ceux qui sont "libres".On peut donc désigner cet axe comme étant l'Autonomie Financière.
+
+## Analyse des individus :
+
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+fviz_pca_ind(Res_ACP,
+             habillage = DATA$Type_Pret,
+             legend.title = "Type_Pret",
+             labelsize = 3,
+             title = "Individus par Type de pret")
+```
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+plot(Res_ACP,axes=c(1,2),choix="ind", habillage = "cos2")
+plot(Res_ACP,axes=c(1,2),choix="ind", habillage = "contrib")
+plot(Res_ACP,axes=c(1,2),choix="ind", habillage = "Score_Credit")
+plot(Res_ACP,axes=c(1,2),choix="ind", habillage = "Revenu_Mensuel")
+
+```
+
+Le nuage de points est globalement centré à l'origine, ce qui ne traduit pas une séparation nette en sous‑populations. Les quatre types de prets sont fortement mélangés autour de l’origine, ce qui veut dire que cette variable ne permet de céer des groupes individus. Les cartes colorées par cos² et contributions indiquent que seuls les individus éloignés, notamment ceux très à droite ou très en haut/bas, sont bien représentés et contribuent vraiment à la définition des axes, tandis que la majorité au centre est mal résumée par le plan. Quand on colore par revenu mensuel, on observe que revenus élevés se concentrent à droite, alors que les faibles revenus se trouvent plutôt à gauche, ce qui conduit à interpréter la première dimension comme un axe de Capacité financière combinant niveau de revenu. Les individus les plus atypiques sont ceux très éloignés du centre : à l’extrême droite, certains numéros comme 95, 195 ou 288 représentent des cas de clients particulièrement premium, avec très haut revenu, alors que des individus très en haut ou en bas comme 145, 50, 47, 201 ou 99 semblent atypiques sur l'axe 2.
+
+## Analyse des variables:
+
+```{r}
+
+plot(Res_ACP,axes=c(1,2),choix="var", habillage = "cos2")
+plot(Res_ACP,axes=c(1,2),choix="var", habillage = "contrib")
+```
+
+La projection des variables sur le plan (axes 1 et 2) montre que le revenu mensuel, les dépenses mensuelles, l’épargne, le montant du prêt et la mensualité du prêt sont fortement corrélés positivement et orientés dans la même direction sur l’axe 1. Cet axe traduit une dimension de niveau économique global, opposant les individus disposant de ressources élevées et contractant des emprunts importants à ceux présentant des niveaux plus faibles de revenus et d’endettement.
+Le ratio dette-revenu est principalement porté par l’axe 2 et apparaît en opposition partielle aux variables de revenu et d’épargne, ce qui traduit une dimension de contrainte financière relative à la l’endettement. Le score de crédit, bien que présent sur le plan, n’est pas fortement corrélé aux variables économiques dominantes de l’axe 1, ce qui indique qu’il capte une information spécifique qui n’est pas directement liée au niveau de revenu ou au montant de l’emprunt.
+
+## Synthèse :
+
+Conclusion de l’ACP L’Analyse en Composantes Principales met en évidence que les comportements d’emprunt sont principalement structurés par le niveau de revenu et la capacité financière des individus. L’axe 1 oppose clairement des profils à hauts revenus, forts montants de prêt et mensualités élevées à des individus aux ressources plus faibles et à un endettement limité. L’axe 2 révèle une dimension complémentaire liée à la contrainte financière, portée par le ratio dette-revenu. Le score de crédit apparaît comme une information relativement indépendante du niveau de revenu, soulignant que la solvabilité ne repose pas uniquement sur les ressources mais aussi sur le profil de risque individuel. Enfin, les variables qualitatives (sexe, région, type de prêt) ne discriminent pas significativement les individus, confirmant que les déterminants de l’emprunt sont avant tout économiques.
+
+# Conclusion
+
+Cette étude a permis de caractériser les profils financiers d’un échantillon d’emprunteurs grâce à une analyse descriptive puis factorielle. Les résultats bivariés confirment des relations économiques attendues, notamment entre revenu et dépenses, ainsi qu’entre montant du prêt et mensualité. En revanche, les variables qualitatives (sexe, région, type de prêt) ne montrent pas d’association statistiquement significative selon les tests du χ², ce qui suggère qu’elles discriminent peu les comportements d’emprunt dans cette base.
+
+L’ACP résume efficacement l’information en deux dimensions expliquant environ 69 % de la variance : la première reflète un niveau financier global (revenu, dépenses, épargne et intensité du crédit), tandis que la seconde traduit une pression d’endettement portée par le ratio dette/revenu. Enfin, le score de crédit apparaît relativement indépendant sur le plan principal, indiquant que la solvabilité dépend aussi d’éléments spécifiques non entièrement captés par les variables économiques disponibles. Globalement, les profils d’emprunteurs sont surtout structurés par la capacité financière et la contrainte d’endettement.
+
+# Bibliographie
+- Jolliffe, I. T. (2002). Principal Component Analysis. Springer. https://link.springer.com/book/10.1007/b98835
+
+- Kaggle. Financial dataset (jeu de données de profils financiers d’emprunteurs, vraisemblablement synthétique). https://www.kaggle.com/ — *lien exact du dataset à compléter*
